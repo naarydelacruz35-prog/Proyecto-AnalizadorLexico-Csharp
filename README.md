@@ -34,7 +34,7 @@ docs/            Diseño de AFD, transiciones, arquitectura y plan
 - Informa identificadores inválidos, números mal formados, cadenas y caracteres sin cerrar, comentarios de bloque sin cerrar y caracteres no reconocidos.
 - Presenta tokens, símbolos y errores en la interfaz. La tabla de símbolos evita duplicados y asocia el tipo declarado cuando lo precede inmediatamente.
 
-Los archivos de `Pruebas/` cubren casos básicos, medios, errores y operadores.
+Los archivos de `pruebas/` cubren casos básicos, medios, errores y operadores.
 
 ## Abrir en Visual Studio
 

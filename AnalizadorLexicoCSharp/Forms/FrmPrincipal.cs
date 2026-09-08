@@ -85,8 +85,4 @@ public partial class FrmPrincipal : Form
         lblArchivoValor.Text = string.IsNullOrEmpty(nombreArchivoActual) ? "Archivo: sin archivo" : $"Archivo: {nombreArchivoActual}";
     }
 
-    private void layoutPrincipal_Paint(object sender, PaintEventArgs e)
-    {
-
-    }
 }

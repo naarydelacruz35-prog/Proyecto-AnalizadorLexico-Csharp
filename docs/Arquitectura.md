@@ -6,7 +6,6 @@ La interfaz se limita a cargar, solicitar el análisis y presentar datos. `Anali
 classDiagram
   FrmPrincipal --> ArchivoService
   FrmPrincipal --> AnalizadorLexico
-  FrmPrincipal --> TablaSimbolos
   AnalizadorLexico --> IAutomata
   AnalizadorLexico --> Token
   AnalizadorLexico --> ErrorLexico
