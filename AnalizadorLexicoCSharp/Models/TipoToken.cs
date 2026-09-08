@@ -1,0 +1,18 @@
+namespace AnalizadorLexicoCSharp.Models;
+
+public enum TipoToken
+{
+    TK_PALABRA_RESERVADA,
+    TK_IDENTIFICADOR,
+    TK_NUM_ENTERO,
+    TK_NUM_REAL,
+    TK_CADENA,
+    TK_CARACTER,
+    TK_OP_ARITMETICO,
+    TK_OP_RELACIONAL,
+    TK_OP_LOGICO,
+    TK_ASIGNACION,
+    TK_DELIMITADOR,
+    TK_COMENTARIO_LINEA,
+    TK_COMENTARIO_BLOQUE
+}
