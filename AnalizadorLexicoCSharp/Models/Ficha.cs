@@ -2,6 +2,7 @@
 {
     public class Ficha
     {
+        public int Numero { get; set; }
         public TipoToken Tipo { get; set; }
         public string Lexema { get; set; }
         public int Linea { get; set; }

@@ -47,6 +47,11 @@ public partial class FrmPrincipal : Form
 
         LimpiarResultados();
         Resultado resultado = new AnalizadorLexico().Analizar(rtbCodigoFuente.Text);
+        for (int i = 0; i < resultado.Tokens.Count; i++)
+        {
+            resultado.Tokens[i].Numero = i + 1;
+        }
+
         dgvTokens.DataSource = resultado.Tokens;
         dgvSimbolos.DataSource = resultado.Simbolos;
         dgvErrores.DataSource = resultado.Errors;
