@@ -1,19 +1,18 @@
-namespace AnalizadorLexicoCSharp.Models
+﻿namespace AnalizadorLexicoCSharp.Models
 {
-    public class ErrorLexico
+    public class Ficha
     {
+        public TipoToken Tipo { get; set; }
         public string Lexema { get; set; }
         public int Linea { get; set; }
         public int Columna { get; set; }
-        public string Descripcion { get; set; }
 
-        public ErrorLexico(string lexema, int linea, int columna, string descripcion)
+        public Ficha(TipoToken tipo, string lexema, int linea, int columna)
         {
+            Tipo = tipo;
             Lexema = lexema;
             Linea = linea;
             Columna = columna;
-            Descripcion = descripcion;
         }
     }
 }
-

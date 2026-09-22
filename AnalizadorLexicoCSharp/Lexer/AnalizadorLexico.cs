@@ -1,124 +1,700 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
 using AnalizadorLexicoCSharp.Automatas;
 using AnalizadorLexicoCSharp.Models;
 
-namespace AnalizadorLexicoCSharp.Lexer;
-
-public class AnalizadorLexico
+namespace AnalizadorLexicoCSharp.Lexer
 {
-    private readonly AutomataComentario automataComentario = new();
-    private readonly AutomataCadena automataCadena = new();
-    private readonly AutomataCaracter automataCaracter = new();
-    private readonly AutomataIdentificador automataIdentificador = new();
-    private readonly AutomataNumero automataNumero = new();
-    private readonly AutomataOperador automataOperador = new();
-    private readonly AutomataDelimitador automataDelimitador = new();
-
-    public IReadOnlyList<IAutomata> Automatas { get; }
-
-    public AnalizadorLexico()
+    public class AnalizadorLexico
     {
-        Automatas = new IAutomata[]
-        {
-            automataIdentificador, automataNumero, automataCadena, automataCaracter,
-            automataOperador, automataComentario, automataDelimitador
-        };
-    }
+        private string codigo;
+        private int posicion;
+        private int linea;
+        private int columna;
 
-    public ResultadoAnalisis Analizar(string fuente)
-    {
-        ResultadoAnalisis resultado = new();
-        int posicion = 0;
-        int linea = 1;
-        int columna = 1;
+        private readonly AutomataAFD automata;
 
-        while (posicion < fuente.Length)
-        {
-            if (char.IsWhiteSpace(fuente[posicion]))
+        private readonly HashSet<string> palabrasReservadas =
+            new HashSet<string>
             {
-                int longitudEspacio = fuente[posicion] == '\r' && posicion + 1 < fuente.Length && fuente[posicion + 1] == '\n' ? 2 : 1;
-                Avanzar(fuente, ref posicion, ref linea, ref columna, longitudEspacio);
-                continue;
-            }
+                "if", "else", "while", "for",
+                "int", "float", "double", "char",
+                "bool", "string", "void", "return",
+                "class", "static", "true", "false",
+                "break", "continue", "switch", "case"
+            };
 
-            int lineaInicio = linea;
-            int columnaInicio = columna;
-            if (IntentarReconocer(fuente, posicion, out Reconocimiento reconocimiento))
+        public AnalizadorLexico()
+        {
+            automata = new AutomataAFD();
+        }
+
+        public Resultado Analizar(string codigoFuente)
+        {
+            codigo = codigoFuente ?? "";
+            posicion = 0;
+            linea = 1;
+            columna = 1;
+
+            Resultado resultado = new Resultado();
+
+            while (!FinDelCodigo())
             {
-                string lexema = fuente.Substring(posicion, reconocimiento.Longitud);
-                if (reconocimiento.Tipo.HasValue)
+                char actual = Actual();
+
+                if (actual == ' ' || actual == '\t' || actual == '\r')
                 {
-                    TipoToken tipo = reconocimiento.Tipo.Value;
-                    if (tipo == TipoToken.TK_IDENTIFICADOR && PalabrasReservadas.EsPalabraReservada(lexema)) tipo = TipoToken.TK_PALABRA_RESERVADA;
-                    resultado.Tokens.Add(new Token { Numero = resultado.Tokens.Count + 1, Lexema = lexema, Tipo = tipo, Linea = lineaInicio, Columna = columnaInicio });
+                    Avanzar();
+                    continue;
+                }
+
+                if (actual == '\n')
+                {
+                    Avanzar();
+                    continue;
+                }
+
+                int lineaInicio = linea;
+                int columnaInicio = columna;
+
+                if (char.IsLetter(actual) || actual == '_')
+                {
+                    LeerIdentificador(resultado, lineaInicio, columnaInicio);
+                }
+                else if (char.IsDigit(actual))
+                {
+                    LeerNumero(resultado, lineaInicio, columnaInicio);
+                }
+                else if (actual == '"')
+                {
+                    LeerCadena(resultado, lineaInicio, columnaInicio);
+                }
+                else if (actual == '\'')
+                {
+                    LeerCaracter(resultado, lineaInicio, columnaInicio);
+                }
+                else if (actual == '/')
+                {
+                    LeerBarraComentario(resultado, lineaInicio, columnaInicio);
+                }
+                else if (actual == '+' || actual == '-' ||
+                         actual == '*' || actual == '%' ||
+                         actual == '=' || actual == '!' ||
+                         actual == '<' || actual == '>' ||
+                         actual == '&' || actual == '|')
+                {
+                    LeerOperador(resultado, lineaInicio, columnaInicio);
+                }
+                else if ("(){}[];,.".Contains(actual.ToString()))
+                {
+                    resultado.Tokens.Add(
+                        new Ficha(
+                            TipoToken.DELIMITADOR,
+                            actual.ToString(),
+                            lineaInicio,
+                            columnaInicio));
+
+                    Avanzar();
                 }
                 else
                 {
-                    resultado.Errores.Add(new ErrorLexico { Lexema = lexema, Descripcion = reconocimiento.DescripcionError ?? "Error léxico", Linea = lineaInicio, Columna = columnaInicio });
+                    string caracter = actual.ToString();
+
+                    resultado.Errors.Add(
+                        new ErrorLexico(
+                            caracter,
+                            lineaInicio,
+                            columnaInicio,
+                            "Carácter no reconocido."));
+
+                    Avanzar();
                 }
-                Avanzar(fuente, ref posicion, ref linea, ref columna, reconocimiento.Longitud);
-                continue;
             }
 
-            resultado.Errores.Add(new ErrorLexico { Lexema = fuente[posicion].ToString(), Descripcion = "Carácter no reconocido", Linea = lineaInicio, Columna = columnaInicio });
-            Avanzar(fuente, ref posicion, ref linea, ref columna, 1);
+            return resultado;
         }
 
-        resultado.TotalLineas = fuente.Length == 0 ? 0 : linea - (TerminaConSaltoDeLinea(fuente) ? 1 : 0);
-        CrearTablaSimbolos(resultado);
-        return resultado;
-    }
-
-    private bool IntentarReconocer(string fuente, int posicion, out Reconocimiento reconocimiento)
-    {
-        IAutomata[] orden = { automataComentario, automataCadena, automataCaracter, automataIdentificador, automataNumero, automataOperador, automataDelimitador };
-        foreach (IAutomata automata in orden)
+        private void LeerIdentificador(
+            Resultado resultado,
+            int lineaInicio,
+            int columnaInicio)
         {
-            if (automata.IntentarReconocer(fuente, posicion, out reconocimiento)) return true;
-        }
-        reconocimiento = new Reconocimiento(0);
-        return false;
-    }
+            StringBuilder lexema = new StringBuilder();
 
-    private static void Avanzar(string fuente, ref int posicion, ref int linea, ref int columna, int longitud)
-    {
-        int limite = posicion + longitud;
-        while (posicion < limite)
-        {
-            if (fuente[posicion] == '\r')
+            while (!FinDelCodigo())
             {
-                posicion++;
-                if (posicion < limite && fuente[posicion] == '\n') posicion++;
-                linea++;
-                columna = 1;
+                char c = Actual();
+
+                if (char.IsLetterOrDigit(c) || c == '_')
+                {
+                    lexema.Append(c);
+                    Avanzar();
+                }
+                else
+                {
+                    break;
+                }
             }
-            else if (fuente[posicion] == '\n')
+
+            string texto = lexema.ToString();
+
+            TipoToken tipo;
+
+            if (palabrasReservadas.Contains(texto))
             {
-                posicion++;
+                tipo = TipoToken.PALABRA_RESERVADA;
+            }
+            else
+            {
+                tipo = TipoToken.IDENTIFICADOR;
+
+                string tipoDeclarado = ObtenerTipoDeclaradoAnterior();
+
+                resultado.Simbolos.Agregar(
+                    texto,
+                    lineaInicio,
+                    tipoDeclarado);
+            }
+
+            resultado.Tokens.Add(
+                new Ficha(
+                    tipo,
+                    texto,
+                    lineaInicio,
+                    columnaInicio));
+        }
+
+        private string ObtenerTipoDeclaradoAnterior()
+        {
+            return "";
+        }
+
+        private void LeerNumero(
+            Resultado resultado,
+            int lineaInicio,
+            int columnaInicio)
+        {
+            StringBuilder lexema = new StringBuilder();
+
+            while (!FinDelCodigo() && char.IsDigit(Actual()))
+            {
+                lexema.Append(Actual());
+                Avanzar();
+            }
+
+            if (!FinDelCodigo() && Actual() == '.')
+            {
+                lexema.Append('.');
+                Avanzar();
+
+                if (FinDelCodigo() || !char.IsDigit(Actual()))
+                {
+                    while (!FinDelCodigo() &&
+                           (char.IsDigit(Actual()) || Actual() == '.'))
+                    {
+                        lexema.Append(Actual());
+                        Avanzar();
+                    }
+
+                    resultado.Errors.Add(
+                        new ErrorLexico(
+                            lexema.ToString(),
+                            lineaInicio,
+                            columnaInicio,
+                            "Número mal formado."));
+
+                    return;
+                }
+
+                while (!FinDelCodigo() && char.IsDigit(Actual()))
+                {
+                    lexema.Append(Actual());
+                    Avanzar();
+                }
+
+                if (!FinDelCodigo() && Actual() == '.')
+                {
+                    while (!FinDelCodigo() &&
+                           (char.IsDigit(Actual()) || Actual() == '.'))
+                    {
+                        lexema.Append(Actual());
+                        Avanzar();
+                    }
+
+                    resultado.Errors.Add(
+                        new ErrorLexico(
+                            lexema.ToString(),
+                            lineaInicio,
+                            columnaInicio,
+                            "Número mal formado."));
+
+                    return;
+                }
+
+                resultado.Tokens.Add(
+                    new Ficha(
+                        TipoToken.NUMERO_REAL,
+                        lexema.ToString(),
+                        lineaInicio,
+                        columnaInicio));
+
+                return;
+            }
+
+            if (!FinDelCodigo() &&
+                (char.IsLetter(Actual()) || Actual() == '_'))
+            {
+                while (!FinDelCodigo() &&
+                       (char.IsLetterOrDigit(Actual()) || Actual() == '_'))
+                {
+                    lexema.Append(Actual());
+                    Avanzar();
+                }
+
+                resultado.Errors.Add(
+                    new ErrorLexico(
+                        lexema.ToString(),
+                        lineaInicio,
+                        columnaInicio,
+                        "Identificador inválido: no puede comenzar con un dígito."));
+
+                return;
+            }
+
+            resultado.Tokens.Add(
+                new Ficha(
+                    TipoToken.NUMERO_ENTERO,
+                    lexema.ToString(),
+                    lineaInicio,
+                    columnaInicio));
+        }
+
+        private void LeerCadena(
+            Resultado resultado,
+            int lineaInicio,
+            int columnaInicio)
+        {
+            StringBuilder lexema = new StringBuilder();
+
+            lexema.Append(Actual());
+            Avanzar();
+
+            bool cerrada = false;
+
+            while (!FinDelCodigo())
+            {
+                char c = Actual();
+
+                if (c == '"')
+                {
+                    lexema.Append(c);
+                    Avanzar();
+                    cerrada = true;
+                    break;
+                }
+
+                if (c == '\n')
+                {
+                    break;
+                }
+
+                if (c == '\\')
+                {
+                    lexema.Append(c);
+                    Avanzar();
+
+                    if (!FinDelCodigo())
+                    {
+                        lexema.Append(Actual());
+                        Avanzar();
+                    }
+                }
+                else
+                {
+                    lexema.Append(c);
+                    Avanzar();
+                }
+            }
+
+            if (!cerrada)
+            {
+                resultado.Errors.Add(
+                    new ErrorLexico(
+                        lexema.ToString(),
+                        lineaInicio,
+                        columnaInicio,
+                        "Cadena sin cerrar."));
+
+                return;
+            }
+
+            resultado.Tokens.Add(
+                new Ficha(
+                    TipoToken.CADENA,
+                    lexema.ToString(),
+                    lineaInicio,
+                    columnaInicio));
+        }
+
+        private void LeerCaracter(
+            Resultado resultado,
+            int lineaInicio,
+            int columnaInicio)
+        {
+            StringBuilder lexema = new StringBuilder();
+
+            lexema.Append(Actual());
+            Avanzar();
+
+            bool valido = false;
+
+            if (FinDelCodigo() || Actual() == '\n')
+            {
+                resultado.Errors.Add(
+                    new ErrorLexico(
+                        lexema.ToString(),
+                        lineaInicio,
+                        columnaInicio,
+                        "Carácter literal sin cerrar."));
+
+                return;
+            }
+
+            if (Actual() == '\\')
+            {
+                lexema.Append(Actual());
+                Avanzar();
+
+                if (!FinDelCodigo())
+                {
+                    lexema.Append(Actual());
+                    Avanzar();
+                }
+            }
+            else
+            {
+                lexema.Append(Actual());
+                Avanzar();
+            }
+
+            if (!FinDelCodigo() && Actual() == '\'')
+            {
+                lexema.Append(Actual());
+                Avanzar();
+                valido = true;
+            }
+
+            if (!valido)
+            {
+                while (!FinDelCodigo() &&
+                       Actual() != '\n' &&
+                       Actual() != '\'')
+                {
+                    lexema.Append(Actual());
+                    Avanzar();
+                }
+
+                if (!FinDelCodigo() && Actual() == '\'')
+                {
+                    lexema.Append(Actual());
+                    Avanzar();
+                }
+
+                resultado.Errors.Add(
+                    new ErrorLexico(
+                        lexema.ToString(),
+                        lineaInicio,
+                        columnaInicio,
+                        "Carácter literal sin cerrar o mal formado."));
+
+                return;
+            }
+
+            resultado.Tokens.Add(
+                new Ficha(
+                    TipoToken.CARACTER,
+                    lexema.ToString(),
+                    lineaInicio,
+                    columnaInicio));
+        }
+
+        private void LeerBarraComentario(
+            Resultado resultado,
+            int lineaInicio,
+            int columnaInicio)
+        {
+            Avanzar();
+
+            if (!FinDelCodigo() && Actual() == '/')
+            {
+                StringBuilder lexema = new StringBuilder();
+                lexema.Append("//");
+                Avanzar();
+
+                while (!FinDelCodigo() && Actual() != '\n')
+                {
+                    lexema.Append(Actual());
+                    Avanzar();
+                }
+
+                resultado.Tokens.Add(
+                    new Ficha(
+                        TipoToken.COMENTARIO_LINEA,
+                        lexema.ToString(),
+                        lineaInicio,
+                        columnaInicio));
+
+                return;
+            }
+
+            if (!FinDelCodigo() && Actual() == '*')
+            {
+                StringBuilder lexema = new StringBuilder();
+                lexema.Append("/*");
+                Avanzar();
+
+                bool cerrado = false;
+
+                while (!FinDelCodigo())
+                {
+                    char c = Actual();
+
+                    if (c == '*' &&
+                        SiguienteDisponible() &&
+                        Siguiente() == '/')
+                    {
+                        lexema.Append('*');
+                        Avanzar();
+
+                        lexema.Append('/');
+                        Avanzar();
+
+                        cerrado = true;
+                        break;
+                    }
+
+                    lexema.Append(c);
+                    Avanzar();
+                }
+
+                if (!cerrado)
+                {
+                    resultado.Errors.Add(
+                        new ErrorLexico(
+                            lexema.ToString(),
+                            lineaInicio,
+                            columnaInicio,
+                            "Comentario de bloque sin cerrar."));
+
+                    return;
+                }
+
+                resultado.Tokens.Add(
+                    new Ficha(
+                        TipoToken.COMENTARIO_BLOQUE,
+                        lexema.ToString(),
+                        lineaInicio,
+                        columnaInicio));
+
+                return;
+            }
+
+            resultado.Tokens.Add(
+                new Ficha(
+                    TipoToken.OPERADOR_ARITMETICO,
+                    "/",
+                    lineaInicio,
+                    columnaInicio));
+        }
+
+        private void LeerOperador(
+            Resultado resultado,
+            int lineaInicio,
+            int columnaInicio)
+        {
+            char actual = Actual();
+            char siguiente = SiguienteDisponible() ? Siguiente() : '\0';
+
+            string lexema = actual.ToString();
+            TipoToken tipo = TipoToken.OPERADOR_ARITMETICO;
+
+            if (actual == '=')
+            {
+                if (siguiente == '=')
+                {
+                    lexema = "==";
+                    tipo = TipoToken.OPERADOR_RELACIONAL;
+                    Avanzar();
+                    Avanzar();
+                }
+                else
+                {
+                    tipo = TipoToken.ASIGNACION;
+                    Avanzar();
+                }
+            }
+            else if (actual == '!')
+            {
+                if (siguiente == '=')
+                {
+                    lexema = "!=";
+                    tipo = TipoToken.OPERADOR_RELACIONAL;
+                    Avanzar();
+                    Avanzar();
+                }
+                else
+                {
+                    tipo = TipoToken.OPERADOR_LOGICO;
+                    Avanzar();
+                }
+            }
+            else if (actual == '<' || actual == '>')
+            {
+                tipo = TipoToken.OPERADOR_RELACIONAL;
+
+                if (siguiente == '=')
+                {
+                    lexema += "=";
+                    Avanzar();
+                    Avanzar();
+                }
+                else
+                {
+                    Avanzar();
+                }
+            }
+            else if (actual == '&')
+            {
+                if (siguiente == '&')
+                {
+                    lexema = "&&";
+                    tipo = TipoToken.OPERADOR_LOGICO;
+                    Avanzar();
+                    Avanzar();
+                }
+                else
+                {
+                    resultado.Errors.Add(
+                        new ErrorLexico(
+                            "&",
+                            lineaInicio,
+                            columnaInicio,
+                            "Operador lógico mal formado. Se esperaba &&."));
+
+                    Avanzar();
+                    return;
+                }
+            }
+            else if (actual == '|')
+            {
+                if (siguiente == '|')
+                {
+                    lexema = "||";
+                    tipo = TipoToken.OPERADOR_LOGICO;
+                    Avanzar();
+                    Avanzar();
+                }
+                else
+                {
+                    resultado.Errors.Add(
+                        new ErrorLexico(
+                            "|",
+                            lineaInicio,
+                            columnaInicio,
+                            "Operador lógico mal formado. Se esperaba ||."));
+
+                    Avanzar();
+                    return;
+                }
+            }
+            else if (actual == '+' || actual == '-')
+            {
+                if (siguiente == actual)
+                {
+                    lexema += actual;
+                    tipo = TipoToken.OPERADOR_ARITMETICO;
+                    Avanzar();
+                    Avanzar();
+                }
+                else if (siguiente == '=')
+                {
+                    lexema += "=";
+                    tipo = TipoToken.ASIGNACION;
+                    Avanzar();
+                    Avanzar();
+                }
+                else
+                {
+                    tipo = TipoToken.OPERADOR_ARITMETICO;
+                    Avanzar();
+                }
+            }
+            else if (actual == '*' || actual == '/')
+            {
+                if (siguiente == '=')
+                {
+                    lexema += "=";
+                    tipo = TipoToken.ASIGNACION;
+                    Avanzar();
+                    Avanzar();
+                }
+                else
+                {
+                    tipo = TipoToken.OPERADOR_ARITMETICO;
+                    Avanzar();
+                }
+            }
+            else if (actual == '%')
+            {
+                tipo = TipoToken.OPERADOR_ARITMETICO;
+                Avanzar();
+            }
+
+            resultado.Tokens.Add(
+                new Ficha(
+                    tipo,
+                    lexema,
+                    lineaInicio,
+                    columnaInicio));
+        }
+
+        private bool FinDelCodigo()
+        {
+            return posicion >= codigo.Length;
+        }
+
+        private char Actual()
+        {
+            return codigo[posicion];
+        }
+
+        private char Siguiente()
+        {
+            return codigo[posicion + 1];
+        }
+
+        private bool SiguienteDisponible()
+        {
+            return posicion + 1 < codigo.Length;
+        }
+
+        private void Avanzar()
+        {
+            if (FinDelCodigo())
+                return;
+
+            if (codigo[posicion] == '\n')
+            {
                 linea++;
                 columna = 1;
             }
             else
             {
-                posicion++;
                 columna++;
             }
+
+            posicion++;
         }
     }
-
-    private static void CrearTablaSimbolos(ResultadoAnalisis resultado)
-    {
-        Services.TablaSimbolos tabla = new();
-        for (int indice = 0; indice < resultado.Tokens.Count; indice++)
-        {
-            Token token = resultado.Tokens[indice];
-            if (token.Tipo != TipoToken.TK_IDENTIFICADOR) continue;
-            string tipoDeclarado = indice > 0 && resultado.Tokens[indice - 1].Tipo == TipoToken.TK_PALABRA_RESERVADA && PalabrasReservadas.EsTipoDeclarable(resultado.Tokens[indice - 1].Lexema)
-                ? resultado.Tokens[indice - 1].Lexema
-                : "-";
-            tabla.Agregar(new Simbolo { Nombre = token.Lexema, TipoToken = token.Tipo, PrimeraLinea = token.Linea, TipoDeclarado = tipoDeclarado });
-        }
-        resultado.Simbolos.AddRange(tabla.Simbolos);
-    }
-
-    private static bool TerminaConSaltoDeLinea(string fuente) => fuente[^1] == '\r' || fuente[^1] == '\n';
 }

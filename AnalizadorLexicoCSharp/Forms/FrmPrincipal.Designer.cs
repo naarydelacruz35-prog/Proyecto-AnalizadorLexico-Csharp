@@ -543,16 +543,6 @@ partial class FrmPrincipal
         ((System.ComponentModel.ISupportInitialize)dgvErrores).EndInit();
         panelEstado.ResumeLayout(false);
         panelEstado.PerformLayout();
-        ConfigurarGrilla(dgvTokens);
-        ConfigurarGrilla(dgvSimbolos);
-        ConfigurarGrilla(dgvErrores);
-        ConfigurarEtiquetaEstado(lblTokens, "Tokens:", 0);
-        ConfigurarEtiquetaEstado(lblTokensValor, "0", 66);
-        ConfigurarEtiquetaEstado(lblErrores, "Errores:", 130);
-        ConfigurarEtiquetaEstado(lblErroresValor, "0", 198);
-        ConfigurarEtiquetaEstado(lblLineas, "Líneas:", 262);
-        ConfigurarEtiquetaEstado(lblLineasValor, "0", 326);
-        ConfigurarEtiquetaEstado(lblArchivoValor, "Archivo: sin archivo", 390);
         ResumeLayout(false);
     }
 

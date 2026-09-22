@@ -46,12 +46,12 @@ public partial class FrmPrincipal : Form
         }
 
         LimpiarResultados();
-        ResultadoAnalisis resultado = new AnalizadorLexico().Analizar(rtbCodigoFuente.Text);
+        Resultado resultado = new AnalizadorLexico().Analizar(rtbCodigoFuente.Text);
         dgvTokens.DataSource = resultado.Tokens;
         dgvSimbolos.DataSource = resultado.Simbolos;
-        dgvErrores.DataSource = resultado.Errores;
+        dgvErrores.DataSource = resultado.Errors;
         tabResultados.SelectedTab = tabTokens;
-        ActualizarEstado(resultado.TotalLineas);
+        ActualizarEstado(rtbCodigoFuente.Lines.Length);
     }
 
     private void btnLimpiar_Click(object? sender, EventArgs e)

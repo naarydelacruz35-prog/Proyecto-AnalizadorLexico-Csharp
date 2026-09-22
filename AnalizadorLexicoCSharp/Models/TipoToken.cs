@@ -1,18 +1,36 @@
-namespace AnalizadorLexicoCSharp.Models;
-
-public enum TipoToken
+namespace AnalizadorLexicoCSharp.Models
 {
-    TK_PALABRA_RESERVADA,
-    TK_IDENTIFICADOR,
-    TK_NUM_ENTERO,
-    TK_NUM_REAL,
-    TK_CADENA,
-    TK_CARACTER,
-    TK_OP_ARITMETICO,
-    TK_OP_RELACIONAL,
-    TK_OP_LOGICO,
-    TK_ASIGNACION,
-    TK_DELIMITADOR,
-    TK_COMENTARIO_LINEA,
-    TK_COMENTARIO_BLOQUE
+    public enum TipoToken
+    {
+        PALABRA_RESERVADA,
+        IDENTIFICADOR,
+        NUMERO_ENTERO,
+        NUMERO_REAL,
+        CADENA,
+        CARACTER,
+        OPERADOR_ARITMETICO,
+        OPERADOR_RELACIONAL,
+        OPERADOR_LOGICO,
+        ASIGNACION,
+        DELIMITADOR,
+        COMENTARIO_LINEA,
+        COMENTARIO_BLOQUE,
+        ERROR,
+
+        // Nombres utilizados por los autómatas del Entregable 2
+        TK_PALABRA_RESERVADA = PALABRA_RESERVADA,
+        TK_IDENTIFICADOR = IDENTIFICADOR,
+        TK_NUM_ENTERO = NUMERO_ENTERO,
+        TK_NUM_REAL = NUMERO_REAL,
+        TK_CADENA = CADENA,
+        TK_CARACTER = CARACTER,
+        TK_OP_ARITMETICO = OPERADOR_ARITMETICO,
+        TK_OP_RELACIONAL = OPERADOR_RELACIONAL,
+        TK_OP_LOGICO = OPERADOR_LOGICO,
+        TK_ASIGNACION = ASIGNACION,
+        TK_DELIMITADOR = DELIMITADOR,
+        TK_COMENTARIO_LINEA = COMENTARIO_LINEA,
+        TK_COMENTARIO_BLOQUE = COMENTARIO_BLOQUE,
+        TK_ERROR = ERROR
+    }
 }
