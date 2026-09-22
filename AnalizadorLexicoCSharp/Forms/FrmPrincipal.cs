@@ -53,7 +53,7 @@ public partial class FrmPrincipal : Form
         }
 
         dgvTokens.DataSource = resultado.Tokens;
-        dgvSimbolos.DataSource = resultado.Simbolos;
+        dgvSimbolos.DataSource = resultado.Simbolos.ObtenerTodos();
         dgvErrores.DataSource = resultado.Errors;
         tabResultados.SelectedTab = tabTokens;
         ActualizarEstado(rtbCodigoFuente.Lines.Length);
