@@ -12,18 +12,11 @@ namespace AnalizadorLexicoCSharp.Lexer
         private int posicion;
         private int linea;
         private int columna;
+        private string tipoDeclaradoActual = "";
 
         private readonly AutomataAFD automata;
 
-        private readonly HashSet<string> palabrasReservadas =
-            new HashSet<string>
-            {
-                "if", "else", "while", "for",
-                "int", "float", "double", "char",
-                "bool", "string", "void", "return",
-                "class", "static", "true", "false",
-                "break", "continue", "switch", "case"
-            };
+        
 
         public AnalizadorLexico()
         {
@@ -137,13 +130,19 @@ namespace AnalizadorLexicoCSharp.Lexer
                 }
             }
 
+
             string texto = lexema.ToString();
 
             TipoToken tipo;
 
-            if (palabrasReservadas.Contains(texto))
+            if (PalabrasReservadas.EsPalabraReservada(texto))
             {
                 tipo = TipoToken.PALABRA_RESERVADA;
+
+                if (PalabrasReservadas.EsTipoDeclarable(texto))
+                {
+                    tipoDeclaradoActual = texto;
+                }
             }
             else
             {
@@ -157,6 +156,7 @@ namespace AnalizadorLexicoCSharp.Lexer
                     tipoDeclarado);
             }
 
+
             resultado.Tokens.Add(
                 new Ficha(
                     tipo,
@@ -167,7 +167,7 @@ namespace AnalizadorLexicoCSharp.Lexer
 
         private string ObtenerTipoDeclaradoAnterior()
         {
-            return "";
+            return tipoDeclaradoActual;
         }
 
         private void LeerNumero(
