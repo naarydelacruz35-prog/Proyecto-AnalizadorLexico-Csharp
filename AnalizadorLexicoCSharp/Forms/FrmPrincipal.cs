@@ -18,12 +18,45 @@ public partial class FrmPrincipal : Form
     public FrmPrincipal()
     {
         InitializeComponent();
+        dgvErrores.DefaultCellStyle.ForeColor = Color.DarkRed;
+        dgvErrores.DefaultCellStyle.SelectionForeColor = Color.White;
+        dgvErrores.DefaultCellStyle.SelectionBackColor = Color.Firebrick;
+        dgvErrores.RowHeadersVisible = false;
 
         CrearPestanaEstadisticas();
         CrearBotonExportar();
 
         ActualizarEstado();
     }
+
+    private void CrearBotonExportar()
+    {
+        btnExportar = new Button
+        {
+            Name = "btnExportar",
+            Text = "Exportar CSV",
+            Width = 130,
+            Height = 38,
+            Margin = new Padding(8),
+            BackColor = Color.SeaGreen,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand
+        };
+
+        btnExportar.Click += btnExportar_Click;
+        panelAcciones.Controls.Add(btnExportar);
+
+        sfdExportar = new SaveFileDialog
+        {
+            Title = "Guardar resultados del análisis",
+            Filter = "Archivo CSV (*.csv)|*.csv",
+            DefaultExt = "csv",
+            AddExtension = true,
+            FileName = "Resultados_Analizador"
+        };
+    }
+
     private void CrearPestanaEstadisticas()
     {
         tabEstadisticas = new TabPage("Estadísticas");
@@ -45,34 +78,7 @@ public partial class FrmPrincipal : Form
 
         tabResultados.TabPages.Add(tabEstadisticas);
     }
-    private void CrearBotonExportar()
-    {
-        btnExportar = new Button
-        {
-            Name = "btnExportar",
-            Text = "Exportar CSV",
-            Width = 130,
-            Height = 38,
-            Margin = new Padding(8),
-            BackColor = Color.SeaGreen,
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
-        };
-
-        btnExportar.Click += btnExportar_Click;
-
-        panelAcciones.Controls.Add(btnExportar);
-
-        sfdExportar = new SaveFileDialog
-        {
-            Title = "Guardar resultados del análisis",
-            Filter = "Archivo CSV (*.csv)|*.csv",
-            DefaultExt = "csv",
-            AddExtension = true,
-            FileName = "Resultados_Analizador"
-        };
-    }
+    
         private void btnExportar_Click(object? sender, EventArgs e)
     {
         bool hayResultados =
@@ -240,7 +246,9 @@ public partial class FrmPrincipal : Form
             dgvTokens.DataSource = resultado.Tokens;
             dgvSimbolos.DataSource = resultado.Simbolos.ObtenerTodos();
             dgvErrores.DataSource = resultado.Errors;
-            
+            MostrarEstadisticas(resultado);
+
+
 
             tabResultados.SelectedTab = tabTokens;
 
