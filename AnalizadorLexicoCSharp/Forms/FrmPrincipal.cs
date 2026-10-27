@@ -12,12 +12,15 @@ public partial class FrmPrincipal : Form
     private long tiempoAnalisisMs;
     private TabPage tabEstadisticas = null!;
     private DataGridView dgvEstadisticas = null!;
+    private Button btnExportar = null!;
+    private SaveFileDialog sfdExportar = null!;
 
     public FrmPrincipal()
     {
         InitializeComponent();
 
-      
+        CrearPestanaEstadisticas();
+        CrearBotonExportar();
 
         ActualizarEstado();
     }
@@ -42,7 +45,144 @@ public partial class FrmPrincipal : Form
 
         tabResultados.TabPages.Add(tabEstadisticas);
     }
+    private void CrearBotonExportar()
+    {
+        btnExportar = new Button
+        {
+            Name = "btnExportar",
+            Text = "Exportar CSV",
+            Width = 130,
+            Height = 38,
+            Margin = new Padding(8),
+            BackColor = Color.SeaGreen,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand
+        };
 
+        btnExportar.Click += btnExportar_Click;
+
+        panelAcciones.Controls.Add(btnExportar);
+
+        sfdExportar = new SaveFileDialog
+        {
+            Title = "Guardar resultados del análisis",
+            Filter = "Archivo CSV (*.csv)|*.csv",
+            DefaultExt = "csv",
+            AddExtension = true,
+            FileName = "Resultados_Analizador"
+        };
+    }
+        private void btnExportar_Click(object? sender, EventArgs e)
+    {
+        bool hayResultados =
+            dgvTokens.Rows.Count > 0 ||
+            dgvSimbolos.Rows.Count > 0 ||
+            dgvErrores.Rows.Count > 0;
+
+        if (!hayResultados)
+        {
+            MessageBox.Show(
+                this,
+                "Primero debes analizar un código fuente.",
+                "No hay resultados",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+
+            return;
+        }
+
+        if (sfdExportar.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            using var escritor = new System.IO.StreamWriter(
+                sfdExportar.FileName,
+                false,
+                new System.Text.UTF8Encoding(true));
+
+            escritor.WriteLine("RESULTADOS DEL ANALIZADOR LÉXICO");
+            escritor.WriteLine();
+
+            EscribirGrillaCSV(escritor, "TOKENS", dgvTokens);
+            EscribirGrillaCSV(escritor, "TABLA DE SÍMBOLOS", dgvSimbolos);
+            EscribirGrillaCSV(escritor, "ERRORES LÉXICOS", dgvErrores);
+
+            MessageBox.Show(
+                this,
+                "Los resultados se exportaron correctamente.",
+                "Exportación completada",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"No fue posible exportar los resultados.\n{ex.Message}",
+                "Error de exportación",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private void EscribirGrillaCSV(
+        System.IO.StreamWriter escritor,
+        string titulo,
+        DataGridView grilla)
+    {
+        escritor.WriteLine(titulo);
+
+        // Escribir los encabezados de las columnas.
+        for (int columna = 0; columna < grilla.Columns.Count; columna++)
+        {
+            if (columna > 0)
+            {
+                escritor.Write(",");
+            }
+
+            escritor.Write(
+                EscaparCSV(grilla.Columns[columna].HeaderText));
+        }
+
+        escritor.WriteLine();
+
+        // Escribir los datos de cada fila.
+        foreach (DataGridViewRow fila in grilla.Rows)
+        {
+            if (fila.IsNewRow)
+            {
+                continue;
+            }
+
+            for (int columna = 0; columna < grilla.Columns.Count; columna++)
+            {
+                if (columna > 0)
+                {
+                    escritor.Write(",");
+                }
+
+                string valor = fila.Cells[columna].Value?.ToString() ?? "";
+
+                escritor.Write(EscaparCSV(valor));
+            }
+
+            escritor.WriteLine();
+        }
+
+        escritor.WriteLine();
+    }
+
+    private string EscaparCSV(string valor)
+    {
+        valor = valor.Replace("\"", "\"\"");
+
+        return $"\"{valor}\"";
+    }
+    
     private void btnAbrirArchivo_Click(object? sender, EventArgs e)
     {
         if (ofdCodigoFuente.ShowDialog(this) != DialogResult.OK)
